@@ -7,10 +7,15 @@ import (
 	"time"
 )
 
+type (
+	GENFUNC func() string
+)
+
 //Goredisbench creates
 type Goredisbench struct {
 	client   *redis.Client
 	commands []string
+	genfunc  GENFUNC
 }
 
 type Options struct {
@@ -36,6 +41,11 @@ func (grb *Goredisbench) AddCommands(commands []string) {
 	} else {
 		log.Fatal("Number of commands must be greather then zero")
 	}
+}
+
+//AddGeneration provides user generation of data for inserting to redis
+func (grb *Goredisbench) AddGeneration(fun GENFUNC) {
+	grb.genfunc = fun
 }
 
 func (grb *Goredisbench) Start(iters []int, opt ...Options) {
@@ -66,8 +76,12 @@ func (grb *Goredisbench) loop(it int, command string, showitmessage bool) float6
 		fmt.Println(itnumber)
 	}
 	for i := 0; i < it; i++ {
-		item := fmt.Sprintf("%s%d%d", command, it, i)
-		grb.client.Cmd("hmset", item, "fun")
+		if grb.genfunc == nil {
+			item := fmt.Sprintf("%s%d%d", command, it, i)
+			grb.client.Cmd("hmset", item, "fun")
+		} else {
+			grb.client.Cmd(command, grb.genfunc(), "fun")
+		}
 	}
 	end := time.Since(start)
 	return end.Seconds()
