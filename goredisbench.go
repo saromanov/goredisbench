@@ -71,16 +71,32 @@ func (grb *Goredisbench) run(iters []int) {
 
 func (grb *Goredisbench) loop(it int, command string, showitmessage bool) float64 {
 	start := time.Now()
-	if showitmessage {
+	/*if showitmessage {
 		itnumber := fmt.Sprintf("Number of iterations: %d", it)
 		fmt.Println(itnumber)
-	}
+	}*/
 	for i := 0; i < it; i++ {
-		if grb.genfunc == nil {
-			item := fmt.Sprintf("%s%d%d", command, it, i)
-			grb.client.Cmd("hmset", item, "fun")
-		} else {
-			grb.client.Cmd(command, grb.genfunc(), "fun")
+		elem := command
+		if grb.genfunc != nil {
+			elem = grb.genfunc()
+		}
+		switch command {
+		case "set":
+			redis_set(grb.client, elem, it, i)
+		case "hset":
+			redis_hset(grb.client, elem, it, i)
+		case "hget":
+			redis_hsets_generic(grb.client, elem, it, i)
+		case "hdel":
+			redis_hsets_generic(grb.client, elem, it, i)
+		case "hlen":
+			redis_hlen(grb.client, elem, it, i)
+		case "lpush":
+			redis_list_generic(grb.client, elem, it, i)
+		case "rpush":
+			redis_list_generic(grb.client, elem, it, i)
+		default:
+			log.Fatal(fmt.Sprintf("Test for command %s not implemented yet", command))
 		}
 	}
 	end := time.Since(start)
@@ -104,3 +120,41 @@ func (grb *Goredisbench) runWithAvg(iters []int, avgtimes int) {
 
 	}
 }
+
+//Commands area
+
+func redis_set(client *redis.Client, command string, num1, num2 int) {
+	item := fmt.Sprintf("%s%d%d", command, num1, num2)
+	client.Cmd(command, item, "fun")
+}
+
+func redis_hset(client *redis.Client, command string, num1, num2 int) {
+	hashname := fmt.Sprintf("%s%d%d", command, num1, num2)
+	field := fmt.Sprintf("%s%s%d%d", command, command, num1, num2)
+	item := fmt.Sprintf("%d%s", num1*num2, command)
+	client.Cmd(command, hashname, field, item)
+}
+
+func redis_hlen(client *redis.Client, command string, num1, num2 int) {
+	hashname := fmt.Sprintf("%s%d%d", command, num1, num2)
+	client.Cmd(command, hashname)
+}
+
+func redis_hsets_generic(client *redis.Client, command string, num1, num2 int) {
+	hashname := fmt.Sprintf("%s%d%d", command, num1, num2)
+	field := fmt.Sprintf("%s%s%d%d", command, command, num1, num2)
+	client.Cmd(command, hashname, field)
+}
+
+func redis_list_generic(client *redis.Client, command string, num1, num2 int) {
+	hashname := fmt.Sprintf("%s", command)
+	field := fmt.Sprintf("%s%s%d%d", command, command, num1, num2)
+	client.Cmd(command, hashname, field)
+}
+
+func redis_list_pop(client *redis.Client, command string) {
+	hashname := fmt.Sprintf("%s", command)
+	client.Cmd(command, hashname)
+}
+
+
