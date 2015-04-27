@@ -5,10 +5,16 @@ import (
 	"github.com/fzzy/radix/redis"
 	"log"
 	"time"
+	"math/rand"
 )
 
 type (
 	GENFUNC func() string
+)
+
+const
+(
+	appendname = "foobar"
 )
 
 //Goredisbench creates
@@ -82,19 +88,27 @@ func (grb *Goredisbench) loop(it int, command string, showitmessage bool) float6
 		}
 		switch command {
 		case "set":
-			redis_set(grb.client, elem, it, i)
+			redis_set(grb.client, it, i)
 		case "hset":
-			redis_hset(grb.client, elem, it, i)
+			redis_hset(grb.client, it, i)
 		case "hget":
 			redis_hsets_generic(grb.client, elem, it, i)
 		case "hdel":
 			redis_hsets_generic(grb.client, elem, it, i)
 		case "hlen":
-			redis_hlen(grb.client, elem, it, i)
+			redis_hlen(grb.client, it, i)
 		case "lpush":
 			redis_list_generic(grb.client, elem, it, i)
 		case "rpush":
 			redis_list_generic(grb.client, elem, it, i)
+		case "zadd":
+			redis_sset(grb.client, command, it, i)
+		case "zrem":
+			redis_sset_generic(grb.client, command, it, i)
+		case "zrank":
+			redis_sset_generic(grb.client, command, it, i)
+		case "zincrby":
+			redis_sset(grb.client, command, it, i)
 		default:
 			log.Fatal(fmt.Sprintf("Test for command %s not implemented yet", command))
 		}
@@ -123,38 +137,61 @@ func (grb *Goredisbench) runWithAvg(iters []int, avgtimes int) {
 
 //Commands area
 
-func redis_set(client *redis.Client, command string, num1, num2 int) {
-	item := fmt.Sprintf("%s%d%d", command, num1, num2)
-	client.Cmd(command, item, "fun")
+func redis_set(client *redis.Client, num1, num2 int) {
+	item := fmt.Sprintf("%s%d%d", appendname, num1, num2)
+	client.Cmd("set", item, "fun")
 }
 
-func redis_hset(client *redis.Client, command string, num1, num2 int) {
-	hashname := fmt.Sprintf("%s%d%d", command, num1, num2)
-	field := fmt.Sprintf("%s%s%d%d", command, command, num1, num2)
-	item := fmt.Sprintf("%d%s", num1*num2, command)
-	client.Cmd(command, hashname, field, item)
+/* Hashes */
+
+func redis_hset(client *redis.Client, num1, num2 int) {
+	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
+	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
+	item := fmt.Sprintf("%d%s", num1*num2, appendname)
+	client.Cmd("hset", hashname, field, item)
 }
 
-func redis_hlen(client *redis.Client, command string, num1, num2 int) {
-	hashname := fmt.Sprintf("%s%d%d", command, num1, num2)
-	client.Cmd(command, hashname)
+func redis_hlen(client *redis.Client, num1, num2 int) {
+	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
+	client.Cmd("hlen", hashname)
 }
 
 func redis_hsets_generic(client *redis.Client, command string, num1, num2 int) {
-	hashname := fmt.Sprintf("%s%d%d", command, num1, num2)
-	field := fmt.Sprintf("%s%s%d%d", command, command, num1, num2)
+	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
+	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
 	client.Cmd(command, hashname, field)
 }
+
+
+/* Lists */
 
 func redis_list_generic(client *redis.Client, command string, num1, num2 int) {
-	hashname := fmt.Sprintf("%s", command)
-	field := fmt.Sprintf("%s%s%d%d", command, command, num1, num2)
+	hashname := fmt.Sprintf("%s", appendname)
+	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
 	client.Cmd(command, hashname, field)
 }
 
-func redis_list_pop(client *redis.Client, command string) {
-	hashname := fmt.Sprintf("%s", command)
-	client.Cmd(command, hashname)
+func redis_list_pop(client *redis.Client) {
+	hashname := fmt.Sprintf("%s", appendname)
+	client.Cmd("lpop", hashname)
 }
 
 
+/* Sorted sets*/
+
+//Additional overhead is random generation of rank
+func redis_sset(client *redis.Client, command string, num1, num2 int) {
+	setname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
+	rand.Seed(time.Now().UnixNano())
+	rank := rand.Intn(20)
+	client.Cmd(command, setname, rank, "fun")
+}
+
+func redis_sset_generic(client *redis.Client, command string, num1, num2 int)  {
+	setname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
+	client.Cmd(command, setname, "fun")
+}
+
+func redis_sset_interstore(client *redis.Client, command string, num1, num2 int) {
+	
+}
