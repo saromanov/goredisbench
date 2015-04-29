@@ -4,24 +4,28 @@ import (
 	"fmt"
 	"github.com/fzzy/radix/redis"
 	"log"
-	"time"
 	"math/rand"
+	"time"
 )
 
 type (
 	GENFUNC func() string
 )
 
-const
-(
+const (
 	appendname = "foobar"
 )
 
 //Goredisbench creates
 type Goredisbench struct {
+	// Create client
 	client   *redis.Client
+	// Commands which contain current test
 	commands []string
+	//Function to generate data for tests
 	genfunc  GENFUNC
+	//Errors contains every test
+	errors []float64
 }
 
 type Options struct {
@@ -66,132 +70,159 @@ func (grb *Goredisbench) run(iters []int) {
 	for _, command := range grb.commands {
 		comm := fmt.Sprintf("Command: %s", command)
 		fmt.Println(comm)
+		globalstatus:= 0.0
 		for _, it := range iters {
 			comm := fmt.Sprintf("Number of iterations: %d", it)
 			fmt.Println(comm)
-			result := grb.loop(it, command, true)
-			fmt.Println("Result: ", result)
+			result,status := grb.loop(it, command, true)
+			fmt.Println("Time to complete: ", result)
+			//fmt.Println("Statusff: ", status)
+			globalstatus = status
+			grb.errors = append(grb.errors, status)
 		}
+		res := fmt.Sprintf("%f percents of operations is complete", globalstatus*100)
+		fmt.Println(res)
+		fmt.Println("\n")
 	}
 }
 
-func (grb *Goredisbench) loop(it int, command string, showitmessage bool) float64 {
+
+func (grb* Goredisbench) Status() []float64{
+	return grb.errors
+}
+func (grb *Goredisbench) loop(it int, command string, showitmessage bool) (float64, float64) {
 	start := time.Now()
 	/*if showitmessage {
 		itnumber := fmt.Sprintf("Number of iterations: %d", it)
 		fmt.Println(itnumber)
 	}*/
+	allstatus := 0
 	for i := 0; i < it; i++ {
 		elem := command
 		if grb.genfunc != nil {
 			elem = grb.genfunc()
 		}
+		status := 0
 		switch command {
 		case "set":
-			redis_set(grb.client, it, i)
+			status = redis_set(grb.client, it, i)
 		case "hset":
-			redis_hset(grb.client, it, i)
+			status = redis_hset(grb.client, it, i)
 		case "hget":
-			redis_hsets_generic(grb.client, elem, it, i)
+			status = redis_hsets_generic(grb.client, elem, it, i)
 		case "hdel":
-			redis_hsets_generic(grb.client, elem, it, i)
+			status = redis_hsets_generic(grb.client, elem, it, i)
 		case "hlen":
-			redis_hlen(grb.client, it, i)
+			status = redis_hlen(grb.client, it, i)
 		case "lpush":
-			redis_list_generic(grb.client, elem, it, i)
+			status = redis_list_generic(grb.client, elem, it, i)
 		case "rpush":
-			redis_list_generic(grb.client, elem, it, i)
+			status = redis_list_generic(grb.client, elem, it, i)
 		case "zadd":
-			redis_sset(grb.client, command, it, i)
+			status = redis_sset(grb.client, command, it, i)
 		case "zrem":
-			redis_sset_generic(grb.client, command, it, i)
+			status = redis_sset_generic(grb.client, command, it, i)
 		case "zrank":
-			redis_sset_generic(grb.client, command, it, i)
+			status = redis_sset_generic(grb.client, command, it, i)
 		case "zincrby":
-			redis_sset(grb.client, command, it, i)
+			status = redis_sset(grb.client, command, it, i)
 		default:
 			log.Fatal(fmt.Sprintf("Test for command %s not implemented yet", command))
 		}
+		if status > 0 {
+			allstatus += 1
+		}
 	}
 	end := time.Since(start)
-	return end.Seconds()
+	return end.Seconds(), float64(allstatus/it)
 }
 
 func (grb *Goredisbench) runWithAvg(iters []int, avgtimes int) {
 	for _, command := range grb.commands {
 		comm := fmt.Sprintf("Command: %s", command)
 		fmt.Println(comm)
+		globalstatus := 0.0
 		for _, it := range iters {
 			preresult := fmt.Sprintf("Average result after %d times of %d iterations", avgtimes, it)
 			fmt.Println(preresult)
 			avgvalue := 0.0
 			for i := 0; i < avgtimes; i++ {
-				result := grb.loop(it, command, false)
+				result, status := grb.loop(it, command, false)
+				globalstatus = status
 				avgvalue += result
 			}
-			fmt.Println("Result: ", avgvalue/float64(avgtimes))
+			fmt.Println("Average time to complete: ", avgvalue/float64(avgtimes))
 		}
+		res := fmt.Sprintf("%f percents of operations is complete", globalstatus*100)
+		fmt.Println(res)
+		fmt.Println("\n")
 
 	}
 }
 
 //Commands area
 
-func redis_set(client *redis.Client, num1, num2 int) {
+func redis_set(client *redis.Client, num1, num2 int) int {
 	item := fmt.Sprintf("%s%d%d", appendname, num1, num2)
-	client.Cmd("set", item, "fun")
+	result, _ := client.Cmd("set", item, "fun").Int()
+	return result
 }
 
 /* Hashes */
 
-func redis_hset(client *redis.Client, num1, num2 int) {
+func redis_hset(client *redis.Client, num1, num2 int) int {
 	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
 	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
 	item := fmt.Sprintf("%d%s", num1*num2, appendname)
-	client.Cmd("hset", hashname, field, item)
+	result, _ := client.Cmd("hset", hashname, field, item).Int()
+	return result
 }
 
-func redis_hlen(client *redis.Client, num1, num2 int) {
+func redis_hlen(client *redis.Client, num1, num2 int) int {
 	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
-	client.Cmd("hlen", hashname)
+	result, _ := client.Cmd("hlen", hashname).Int()
+	return result
 }
 
-func redis_hsets_generic(client *redis.Client, command string, num1, num2 int) {
+func redis_hsets_generic(client *redis.Client, command string, num1, num2 int) int{
 	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
 	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
-	client.Cmd(command, hashname, field)
+	result , _ := client.Cmd(command, hashname, field).Int()
+	return result
 }
-
 
 /* Lists */
 
-func redis_list_generic(client *redis.Client, command string, num1, num2 int) {
+func redis_list_generic(client *redis.Client, command string, num1, num2 int) int{
 	hashname := fmt.Sprintf("%s", appendname)
 	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
-	client.Cmd(command, hashname, field)
+	result, _ := client.Cmd(command, hashname, field).Int()
+	return result
 }
 
-func redis_list_pop(client *redis.Client) {
+func redis_list_pop(client *redis.Client) int {
 	hashname := fmt.Sprintf("%s", appendname)
-	client.Cmd("lpop", hashname)
+	result, _ := client.Cmd("lpop", hashname).Int()
+	return result
 }
-
 
 /* Sorted sets*/
 
 //Additional overhead is random generation of rank
-func redis_sset(client *redis.Client, command string, num1, num2 int) {
+func redis_sset(client *redis.Client, command string, num1, num2 int) int{
 	setname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
 	rand.Seed(time.Now().UnixNano())
 	rank := rand.Intn(20)
-	client.Cmd(command, setname, rank, "fun")
+	result , _:= client.Cmd(command, setname, rank, "fun").Int()
+	return result
 }
 
-func redis_sset_generic(client *redis.Client, command string, num1, num2 int)  {
+func redis_sset_generic(client *redis.Client, command string, num1, num2 int) int {
 	setname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
-	client.Cmd(command, setname, "fun")
+	result , _:= client.Cmd(command, setname, "fun").Int()
+	return result
 }
 
 func redis_sset_interstore(client *redis.Client, command string, num1, num2 int) {
-	
+
 }
