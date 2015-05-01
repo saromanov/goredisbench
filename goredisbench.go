@@ -13,17 +13,17 @@ type (
 )
 
 const (
-	appendname = "foobar"
+	appendname = "foobar1"
 )
 
 //Goredisbench creates
 type Goredisbench struct {
 	// Create client
-	client   *redis.Client
+	client *redis.Client
 	// Commands which contain current test
 	commands []string
 	//Function to generate data for tests
-	genfunc  GENFUNC
+	genfunc GENFUNC
 	//Errors contains every test
 	errors []float64
 
@@ -78,11 +78,11 @@ func (grb *Goredisbench) run(iters []int) {
 	for _, command := range grb.commands {
 		comm := fmt.Sprintf("Command: %s", command)
 		fmt.Println(comm)
-		globalstatus:= 0.0
+		globalstatus := 0.0
 		for _, it := range iters {
 			comm := fmt.Sprintf("Number of iterations: %d", it)
 			fmt.Println(comm)
-			result,status := grb.loop(it, command, grb.showerrormessages)
+			result, status := grb.loop(it, command, grb.showerrormessages)
 			fmt.Println("Time to complete: ", result)
 			//fmt.Println("Statusff: ", status)
 			globalstatus = status
@@ -94,8 +94,7 @@ func (grb *Goredisbench) run(iters []int) {
 	}
 }
 
-
-func (grb* Goredisbench) Status() []float64{
+func (grb *Goredisbench) Status() []float64 {
 	return grb.errors
 }
 func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (float64, float64) {
@@ -111,6 +110,7 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 			elem = grb.genfunc()
 		}
 		status := 0
+		setname := fmt.Sprintf("%s%d%d", appendname, it, i)
 		switch command {
 		case "set":
 			status = redis_set(grb.client, it, i, showerrormessages)
@@ -134,6 +134,12 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 			status = redis_sset_generic(grb.client, command, it, i, showerrormessages)
 		case "zincrby":
 			status = redis_sset(grb.client, command, it, i, showerrormessages)
+		case "pfadd":
+			status = redis_hyperloglog(grb.client, setname, showerrormessages)
+		case "pfcount":
+			status = redis_hyperloglog_count(grb.client, showerrormessages)
+		case "pfmerge":
+			status = redis_hyperloglog_merge(grb.client, setname, setname+setname, showerrormessages)
 		default:
 			log.Fatal(fmt.Sprintf("Test for command %s not implemented yet", command))
 		}
@@ -142,7 +148,7 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 		}
 	}
 	end := time.Since(start)
-	return end.Seconds(), float64(allstatus/it)
+	return end.Seconds(), float64(allstatus / it)
 }
 
 func (grb *Goredisbench) runWithAvg(iters []int, avgtimes int) {
@@ -170,7 +176,7 @@ func (grb *Goredisbench) runWithAvg(iters []int, avgtimes int) {
 
 //Commands area
 
-func checker(err error, isshow bool){
+func checker(err error, isshow bool) {
 	if err != nil && isshow {
 		log.Fatal(err)
 	}
@@ -178,7 +184,7 @@ func checker(err error, isshow bool){
 
 func redis_set(client *redis.Client, num1, num2 int, msg bool) int {
 	item := fmt.Sprintf("%s%d%d", appendname, num1, num2)
-	result,err := client.Cmd("set", item, "fun").Int()
+	result, err := client.Cmd("set", item, "fun").Int()
 	checker(err, msg)
 	return result
 }
@@ -189,8 +195,8 @@ func redis_hset(client *redis.Client, num1, num2 int, msg bool) int {
 	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
 	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
 	item := fmt.Sprintf("%d%s", num1*num2, appendname)
-	result,err := client.Cmd("hset", hashname, field, item).Int()
-	if err != nil && msg{
+	result, err := client.Cmd("hset", hashname, field, item).Int()
+	if err != nil && msg {
 		fmt.Println(err)
 	}
 	return result
@@ -198,23 +204,25 @@ func redis_hset(client *redis.Client, num1, num2 int, msg bool) int {
 
 func redis_hlen(client *redis.Client, num1, num2 int, msg bool) int {
 	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
-	result,_ := client.Cmd("hlen", hashname).Int()
+	result, _ := client.Cmd("hlen", hashname).Int()
 	return result
 }
 
-func redis_hsets_generic(client *redis.Client, command string, num1, num2 int, msg bool) int{
+func redis_hsets_generic(client *redis.Client, command string, num1, num2 int, msg bool) int {
 	hashname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
 	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
-	result ,_ := client.Cmd(command, hashname, field).Int()
+	result, err := client.Cmd(command, hashname, field).Int()
+	checker(err, msg)
 	return result
 }
 
 /* Lists */
 
-func redis_list_generic(client *redis.Client, command string, num1, num2 int, msg bool) int{
+func redis_list_generic(client *redis.Client, command string, num1, num2 int, msg bool) int {
 	hashname := fmt.Sprintf("%s", appendname)
 	field := fmt.Sprintf("%s%s%d%d", appendname, appendname, num1, num2)
-	result,_ := client.Cmd(command, hashname, field).Int()
+	result, err := client.Cmd(command, hashname, field).Int()
+	checker(err, msg)
 	return result
 }
 
@@ -228,22 +236,46 @@ func redis_list_pop(client *redis.Client, msg bool) int {
 /* Sorted sets*/
 
 //Additional overhead is random generation of rank
-func redis_sset(client *redis.Client, command string, num1, num2 int, msg bool) int{
+func redis_sset(client *redis.Client, command string, num1, num2 int, msg bool) int {
 	setname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
 	rand.Seed(time.Now().UnixNano())
 	rank := rand.Intn(20)
-	result, err := client.Cmd(command, setname, rank, "fun").Int()
+	result, err := client.Cmd(command, "fun", rank, setname).Int()
 	checker(err, msg)
 	return result
 }
 
 func redis_sset_generic(client *redis.Client, command string, num1, num2 int, msg bool) int {
 	setname := fmt.Sprintf("%s%d%d", appendname, num1, num2)
-	result , err:= client.Cmd(command, setname, "fun").Int()
+	result, err := client.Cmd(command, "fun", setname).Int()
 	checker(err, msg)
 	return result
 }
 
 func redis_sset_interstore(client *redis.Client, command string, num1, num2 int, msg bool) {
 
+}
+
+/* Hyperloglog */
+
+func redis_hyperloglog(client *redis.Client, hashname string, msg bool) int {
+	//client.Cmd("hrem", "fun")
+	result, err := client.Cmd("pfadd", "fun", hashname).Int()
+	checker(err, msg)
+	return result
+}
+
+func redis_hyperloglog_count(client *redis.Client, msg bool) int {
+	result, err := client.Cmd("pfcount", "fun").Int()
+	checker(err, msg)
+	return result
+}
+
+//Merge two sets
+func redis_hyperloglog_merge(client *redis.Client, hashname1, hashname2 string, msg bool) int {
+	redis_hyperloglog(client, hashname1, msg)
+	redis_hyperloglog(client, hashname2, msg)
+	result, err := client.Cmd("pfmerge", "fun", hashname1, hashname2).Int()
+	checker(err, msg)
+	return result
 }
