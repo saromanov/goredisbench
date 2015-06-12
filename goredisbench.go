@@ -95,7 +95,8 @@ func (grb *Goredisbench) CommandsTime(command string, numtime time.Duration)uint
     go func() {
         for {
         	atomic.AddUint64(&ops, 1)
-        	redis_list_generic(grb.client, command, "A", false)
+        	grb.executeCommand(command, "A", false, 1,2)
+        	//redis_list_generic(grb.client, command, "A", false)
         	runtime.Gosched()
         }
     }()
@@ -137,8 +138,19 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 		if grb.genfunc != nil {
 			elem = grb.genfunc()
 		}
-		status := 0
-		switch command {
+		status := grb.executeCommand(command, elem,showerrormessages, it, i)
+		if status > 0 {
+			allstatus += 1
+		}
+	}
+	end := time.Since(start)
+	return end.Seconds(), allstatus / float64(it)
+}
+
+
+func (grb *Goredisbench) executeCommand(command string, elem string,showerrormessages bool, it, i int) int{
+	status := 0
+	switch command {
 		case "set":
 			status = redis_set(grb.client, it, i, showerrormessages)
 		case "hset":
@@ -172,14 +184,11 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 		case "pfmerge":
 			status = redis_hyperloglog_merge(grb.client, elem, elem+elem, showerrormessages)
 		default:
-			log.Fatal(fmt.Sprintf("Test for command %s not implemented yet", command))
+			log.Printf(fmt.Sprintf("Test for command %s not implemented yet", command))
+			return 0
 		}
-		if status > 0 {
-			allstatus += 1
-		}
-	}
-	end := time.Since(start)
-	return end.Seconds(), allstatus / float64(it)
+		return status
+
 }
 
 func (grb *Goredisbench) runWithAvg(iters []int, avgtimes int) {
