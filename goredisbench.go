@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand"
 	"time"
+	"strings"
 )
 
 type (
@@ -74,6 +75,7 @@ func (grb *Goredisbench) Start(iters []int, opt ...Options) {
 	grb.client.Cmd("del", appendhashname)
 	grb.client.Cmd("del", appendsetname)
 	grb.client.Cmd("del", appendlistname)
+	fmt.Println(redis_info(grb.client, "redis_version"))
 
 	if len(opt) > 0 && opt[0].Showerrors {
 		grb.showerrormessages = opt[0].Showerrors
@@ -107,6 +109,7 @@ func (grb *Goredisbench) run(iters []int) {
 func (grb *Goredisbench) Status() []float64 {
 	return grb.errors
 }
+
 func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (float64, float64) {
 	start := time.Now()
 	allstatus := 0.0
@@ -272,4 +275,18 @@ func redis_hyperloglog_merge(client *redis.Client, hashname1, hashname2 string, 
 	result, err := client.Cmd("pfmerge", appendhllname, hashname1, hashname2).Int()
 	checker(err, msg)
 	return result
+}
+
+
+/* Info */
+
+//Get information from redis from command INFO
+func redis_info(client *redis.Client, param string)string {
+	lines := strings.Split(client.Cmd("info").String(), "\n")
+    for _, line := range lines {
+    	if strings.HasPrefix(line ,param) {
+    		return line
+    	}
+    }
+    return ""
 }
