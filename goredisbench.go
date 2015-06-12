@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"time"
 	"strings"
+	"sync/atomic"
+	"runtime"
 )
 
 type (
@@ -85,6 +87,20 @@ func (grb *Goredisbench) Start(iters []int, opt ...Options) {
 	} else {
 		grb.run(iters)
 	}
+}
+
+//CommandsTime returns number of commands executed per time num
+func (grb *Goredisbench) CommandsTime(command string, numtime time.Duration)uint64 {
+	var ops uint64 = 0
+    go func() {
+        for {
+        	atomic.AddUint64(&ops, 1)
+        	redis_list_generic(grb.client, command, "A", false)
+        	runtime.Gosched()
+        }
+    }()
+    time.Sleep(numtime)
+    return atomic.LoadUint64(&ops)
 }
 
 func (grb *Goredisbench) run(iters []int) {
