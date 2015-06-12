@@ -90,6 +90,9 @@ func (grb *Goredisbench) Start(iters []int, opt ...Options) {
 func (grb *Goredisbench) run(iters []int) {
 	for _, command := range grb.commands {
 		comm := fmt.Sprintf("Command: %s", command)
+		if command == "lpushx" || command == "rpushx" {
+			redis_list_generic(grb.client, "lpush", "A", false)
+		}
 		fmt.Println(comm)
 		globalstatus := 1.0
 		for _, it := range iters {
@@ -131,6 +134,10 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 		case "hlen":
 			status = redis_hlen(grb.client, showerrormessages)
 		case "lpush":
+			status = redis_list_generic(grb.client, command, elem, showerrormessages)
+		case "lpushx":
+			status = redis_list_generic(grb.client, command, elem, showerrormessages)
+		case "rpushx":
 			status = redis_list_generic(grb.client, command, elem, showerrormessages)
 		case "rpush":
 			status = redis_list_generic(grb.client, command, elem, showerrormessages)
