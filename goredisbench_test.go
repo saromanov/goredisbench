@@ -103,3 +103,11 @@ func TestHyperloglogMerge (t *testing.T) {
 	}
 }
 
+func TestCommandsTime (t *testing.T) {
+	grb := Init("127.0.0.1:6379")
+	result := grb.CommandsTime("zadd", time.Second * 2)
+	if result == 0 {
+		t.Errorf("Error in CommandsTime")
+	}
+}
+
