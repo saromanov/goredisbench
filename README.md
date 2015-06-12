@@ -33,6 +33,12 @@ Time to complete:  0.158961706
 100.000000 percents of operations is complete
 ```
 
+For counting amount of commands per time use
+```go
+fun := goredisbench.Init("127.0.0.1:6379")
+fmt.Println(fun.CommandsTime("zadd", time.Second * 2)) // Return number of zadd commands executed per 2 seconds
+```
+
 # Supported commands
 ZADD, ZREM, ZRANK, ZINCRBY, SET, HSET, HGET, HDEL, HLEN, LPUSH, RPUSH, LPUSHX, RPUSHX, PFADD, PFCOUNT, PFMERGE
 
