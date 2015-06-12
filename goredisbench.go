@@ -5,10 +5,10 @@ import (
 	"github.com/fzzy/radix/redis"
 	"log"
 	"math/rand"
-	"time"
+	"runtime"
 	"strings"
 	"sync/atomic"
-	"runtime"
+	"time"
 )
 
 type (
@@ -90,18 +90,18 @@ func (grb *Goredisbench) Start(iters []int, opt ...Options) {
 }
 
 //CommandsTime returns number of commands executed per time num
-func (grb *Goredisbench) CommandsTime(command string, numtime time.Duration)uint64 {
+func (grb *Goredisbench) CommandsTime(command string, numtime time.Duration) uint64 {
 	var ops uint64 = 0
-    go func() {
-        for {
-        	atomic.AddUint64(&ops, 1)
-        	grb.executeCommand(command, "A", false, 1,2)
-        	//redis_list_generic(grb.client, command, "A", false)
-        	runtime.Gosched()
-        }
-    }()
-    time.Sleep(numtime)
-    return atomic.LoadUint64(&ops)
+	go func() {
+		for {
+			atomic.AddUint64(&ops, 1)
+			grb.executeCommand(command, "A", false, 1, 2)
+			//redis_list_generic(grb.client, command, "A", false)
+			runtime.Gosched()
+		}
+	}()
+	time.Sleep(numtime)
+	return atomic.LoadUint64(&ops)
 }
 
 func (grb *Goredisbench) run(iters []int) {
@@ -138,7 +138,7 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 		if grb.genfunc != nil {
 			elem = grb.genfunc()
 		}
-		status := grb.executeCommand(command, elem,showerrormessages, it, i)
+		status := grb.executeCommand(command, elem, showerrormessages, it, i)
 		if status > 0 {
 			allstatus += 1
 		}
@@ -147,47 +147,46 @@ func (grb *Goredisbench) loop(it int, command string, showerrormessages bool) (f
 	return end.Seconds(), allstatus / float64(it)
 }
 
-
-func (grb *Goredisbench) executeCommand(command string, elem string,showerrormessages bool, it, i int) int{
+func (grb *Goredisbench) executeCommand(command string, elem string, showerrormessages bool, it, i int) int {
 	status := 0
 	switch command {
-		case "set":
-			status = redis_set(grb.client, it, i, showerrormessages)
-		case "hset":
-			status = redis_hset(grb.client, elem, showerrormessages)
-		case "hget":
-			status = redis_hsets_generic(grb.client, command, elem, showerrormessages)
-		case "hdel":
-			status = redis_hsets_generic(grb.client, command, elem, showerrormessages)
-		case "hlen":
-			status = redis_hlen(grb.client, showerrormessages)
-		case "lpush":
-			status = redis_list_generic(grb.client, command, elem, showerrormessages)
-		case "lpushx":
-			status = redis_list_generic(grb.client, command, elem, showerrormessages)
-		case "rpushx":
-			status = redis_list_generic(grb.client, command, elem, showerrormessages)
-		case "rpush":
-			status = redis_list_generic(grb.client, command, elem, showerrormessages)
-		case "zadd":
-			status = redis_sset(grb.client, command, elem, showerrormessages)
-		case "zrem":
-			status = redis_sset_generic(grb.client, command, elem, showerrormessages)
-		case "zrank":
-			status = redis_sset_generic(grb.client, command, elem, showerrormessages)
-		case "zincrby":
-			status = redis_sset(grb.client, command, elem, showerrormessages)
-		case "pfadd":
-			status = redis_hyperloglog(grb.client, elem, showerrormessages)
-		case "pfcount":
-			status = redis_hyperloglog_count(grb.client, showerrormessages)
-		case "pfmerge":
-			status = redis_hyperloglog_merge(grb.client, elem, elem+elem, showerrormessages)
-		default:
-			log.Printf(fmt.Sprintf("Test for command %s not implemented yet", command))
-			return 0
-		}
-		return status
+	case "set":
+		status = redis_set(grb.client, it, i, showerrormessages)
+	case "hset":
+		status = redis_hset(grb.client, elem, showerrormessages)
+	case "hget":
+		status = redis_hsets_generic(grb.client, command, elem, showerrormessages)
+	case "hdel":
+		status = redis_hsets_generic(grb.client, command, elem, showerrormessages)
+	case "hlen":
+		status = redis_hlen(grb.client, showerrormessages)
+	case "lpush":
+		status = redis_list_generic(grb.client, command, elem, showerrormessages)
+	case "lpushx":
+		status = redis_list_generic(grb.client, command, elem, showerrormessages)
+	case "rpushx":
+		status = redis_list_generic(grb.client, command, elem, showerrormessages)
+	case "rpush":
+		status = redis_list_generic(grb.client, command, elem, showerrormessages)
+	case "zadd":
+		status = redis_sset(grb.client, command, elem, showerrormessages)
+	case "zrem":
+		status = redis_sset_generic(grb.client, command, elem, showerrormessages)
+	case "zrank":
+		status = redis_sset_generic(grb.client, command, elem, showerrormessages)
+	case "zincrby":
+		status = redis_sset(grb.client, command, elem, showerrormessages)
+	case "pfadd":
+		status = redis_hyperloglog(grb.client, elem, showerrormessages)
+	case "pfcount":
+		status = redis_hyperloglog_count(grb.client, showerrormessages)
+	case "pfmerge":
+		status = redis_hyperloglog_merge(grb.client, elem, elem+elem, showerrormessages)
+	default:
+		log.Printf(fmt.Sprintf("Test for command %s not implemented yet", command))
+		return 0
+	}
+	return status
 
 }
 
@@ -309,16 +308,15 @@ func redis_hyperloglog_merge(client *redis.Client, hashname1, hashname2 string, 
 	return result
 }
 
-
 /* Info */
 
 //Get information from redis from command INFO
-func redis_info(client *redis.Client, param string)string {
+func redis_info(client *redis.Client, param string) string {
 	lines := strings.Split(client.Cmd("info").String(), "\n")
-    for _, line := range lines {
-    	if strings.HasPrefix(line ,param) {
-    		return line
-    	}
-    }
-    return ""
+	for _, line := range lines {
+		if strings.HasPrefix(line, param) {
+			return line
+		}
+	}
+	return ""
 }
