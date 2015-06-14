@@ -70,13 +70,19 @@ func (grb *Goredisbench) AddGeneration(fun GENFUNC) {
 	grb.genfunc = fun
 }
 
-func (grb *Goredisbench) Start(iters []int, opt ...Options) {
 
+//Remove all data from previous tests
+func (grb *Goredisbench) delete_previus() {
 	grb.client.Cmd("del", appendhllname)
 	grb.client.Cmd("del", appendname)
 	grb.client.Cmd("del", appendhashname)
 	grb.client.Cmd("del", appendsetname)
 	grb.client.Cmd("del", appendlistname)
+}
+
+//Start provides main function to start tests
+func (grb *Goredisbench) Start(iters []int, opt ...Options) {
+	grb.delete_previus()
 	fmt.Println(redis_info(grb.client, "redis_version"))
 
 	if len(opt) > 0 && opt[0].Showerrors {
@@ -280,6 +286,8 @@ func redis_sset_generic(client *redis.Client, command string, setname string, ms
 	return result
 }
 
+
+//TODO
 func redis_sset_interstore(client *redis.Client, command string, num1, num2 int, msg bool) {
 
 }
