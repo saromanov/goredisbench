@@ -96,7 +96,7 @@ func (grb *Goredisbench) Start(iters []int, opt ...Options) {
 }
 
 //CommandsTime returns number of commands executed per time num
-func (grb *Goredisbench) CommandsTime(command string, numtime time.Duration) uint64 {
+func (grb *Goredisbench) CommandsTime(command string, numtime time.Duration){
 	var ops uint64 = 0
 	go func() {
 		for {
@@ -107,7 +107,9 @@ func (grb *Goredisbench) CommandsTime(command string, numtime time.Duration) uin
 		}
 	}()
 	time.Sleep(numtime)
-	return atomic.LoadUint64(&ops)
+	result := atomic.LoadUint64(&ops)
+	fmt.Println(fmt.Sprintf("Command: %s", command))
+	fmt.Println(fmt.Sprintf("Number of complete operations: %d", result))
 }
 
 func (grb *Goredisbench) run(iters []int) {
